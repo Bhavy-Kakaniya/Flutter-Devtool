@@ -116,33 +116,71 @@ func getDevices(adbPath string) ([]Device, error) {
 
 	output, err := command.Output() // run command and get what it prints
 	if err != nil {
-		return  nil, err // if err return no device
+		return nil, err // if err return no device
 	}
 	devices := parseDevices(string(output)) // convert raw adb output in Device struct
 	return devices, nil
 }
 
-func main() {
-	adbPath, err := findADB() // find where adb is installed on pc or laptop
-	// stop if adb could not be found
+func runDevices() {
+	// find where ADB is installed on computer
+	adbPath, err := findADB()
+
+	// stop id ADB not found
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
 
-	fmt.Println("ADB found at:", adbPath) // show location of adb
-	devices, err := getDevices(adbPath) // ask adb for current connected devices
+	// show adb location so user know which adb is being used
+	fmt.Println("ADB found at", adbPath)
 
-	// stop if adb failed to provide device list
+	// ask ADB for all currently connected devices
+	devices, err := getDevices(adbPath)
+
+	// stop if ADB failed to return device list
 	if err != nil {
 		fmt.Println("Error running ADB:", err)
 		return
 	}
 
-	fmt.Println("\nConnected Devices")
+	fmt.Println("\nConneced devices")
+	if len(devices) == 0 {
+		// tell user no device were found
+		fmt.Println("No device connected")
+		return
+	}
 
+	// loop through every connected device
 	for _, device := range devices {
-		fmt.Println("ID: ", device.ID)
-		fmt.Println("Status: ", device.Status)
+		fmt.Println("ID:", device.ID)
+		fmt.Println("Status:", device.Status)
+	}
+}
+
+func main() {
+
+	//check whether user provided a command after program name like go run . devices
+	if len(os.Args) < 2 {
+		// Tell user how program should be used
+		fmt.Println("Usage: flutter-devtool <command>")
+
+		// stop program as no command was provided
+		return
+	}
+
+	// get first argument provided by user
+	// example: go run . devices, devices will be first argument
+	command := os.Args[1]
+
+	// check which command is requested
+	switch command {
+	case "devices":
+		// run the devices command
+		runDevices()
+	default:
+		// user entered command which is not supported
+		fmt.Println("Unknown command:", command)
+		fmt.Println("Available commands: devices")
 	}
 }
