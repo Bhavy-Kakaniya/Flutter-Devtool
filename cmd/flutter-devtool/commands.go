@@ -5,21 +5,30 @@ import (
 	"os"
 )
 
+// getArguments returns the arguments provided by the user
+// os.Args[0] is the program itself, so we remove it
+func getArguments() []string {
+	return os.Args[1:]
+}
+
+// runCommand decides which command the user requested
 func runCommand(args []string) {
-	if len(args) < 1 { // tell user how to use command
+
+	// check whether the user provided any command
+	if len(args) < 1 {
 		fmt.Println("Usage: flutter-devtool <command>")
 		return
 	}
 
-	command := args[0] // get first argument // for flutter-devtool devices it is devices
+	// get the first user-provided argument example: ["devices"] -> "devices"
+	command := args[0]
+
+	// decide what to execute based on command
 	switch command {
 	case "devices":
+		runDevices()
 	default:
-		fmt.Println("Unknown commands:", command)
+		fmt.Println("Unknown command:", command)
 		fmt.Println("Available commands: devices")
 	}
-}
-
-func getArguments() [] string {
-	return os.Args[1:] // no need of os.args[0] so return everything after it
 }
