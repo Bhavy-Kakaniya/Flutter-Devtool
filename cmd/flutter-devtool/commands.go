@@ -27,6 +27,8 @@ func runCommand(args []string) {
 	switch command {
 	case "devices":
 		runDevices()
+	case "run":
+		runFlutter(args[1:])	
 	default:
 		fmt.Println("Unknown command:", command)
 		fmt.Println("Available commands: devices")
