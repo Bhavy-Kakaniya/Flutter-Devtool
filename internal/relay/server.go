@@ -6,7 +6,7 @@ import (
 )
 
 func StartServer() error {
-	listener, err := net.Listen("tcp", "9000")
+	listener, err := net.Listen("tcp", ":9000")
 	// create a TCP listener
 	// :9000 means listen on all available network interfaces use port 9000
 	if err != nil {

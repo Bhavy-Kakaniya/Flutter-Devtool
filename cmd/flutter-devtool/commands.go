@@ -29,6 +29,8 @@ func runCommand(args []string) {
 		runDevices()
 	case "run":
 		runFlutter(args[1:])	
+	case "relay":
+		runRelay()
 	default:
 		fmt.Println("Unknown command:", command)
 		fmt.Println("Available commands: devices")
