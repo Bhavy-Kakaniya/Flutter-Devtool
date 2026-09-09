@@ -13,12 +13,12 @@ func StartServer() error {
 		return fmt.Errorf("Failed to start relay server: %w", err)
 	}
 
-	defer listener.Close() // close when function exists
+	defer listener.Close() // close when function exits
 	fmt.Println("Relay server listening on port 9000")
 
-	var clients []net.Conn // temporary stores connected clients
+	sessionId := 1 // give every session unique number
 
-	// wait for new clients
+	// keep accepting clients
 	for {
 		connection, err := listener.Accept() // accept waits until client connects
 
@@ -28,38 +28,25 @@ func StartServer() error {
 		}
 		fmt.Println("Client connected:", connection.RemoteAddr())
 
-		clients = append(clients, connection) // add this client to list
-		fmt.Println("Connected clients:", len(clients))
+		session := NewSession(sessionId)
+		sessionId++
+		session.AddClient(connection)
 
-		if len(clients) == 2 {
-			fmt.Println("Two client connected, starting relay...")
-			clientA := clients[0]
-			clientB := clients[1]
+		fmt.Println("Waiting for second client for session", session.ID)
 
-			go forward(clientA, clientB)
-			go forward(clientB, clientA)
+		secondConnection, err := listener.Accept()
 
-			clients = nil // reset client list so another pair can be created later
-		}
-	}
-}
-
-// forward continuosly copies data from one connection to another
-func forward(source net.Conn, destination net.Conn) {
-	buffer := make([]byte, 4096) // store incoming bytes
-
-	for {
-		numberOfBytes, err := source.Read(buffer)
 		if err != nil {
-			fmt.Println("Connection closed:", source.RemoteAddr())
-			return
+			fmt.Println("Failed to accept second client", err)
+			session.Close()
+			continue
 		}
+		fmt.Println("Client connected:", secondConnection.RemoteAddr())
 
-		_, err = destination.Write(buffer[:numberOfBytes])
-		if err != nil {
-			fmt.Println("Failed to forward data:", err)
-			return
+		session.AddClient(secondConnection)
+		if session.IsReady() {
+			fmt.Println("Both clients are connected to session", session.ID)
+			session.StartRelay()
 		}
-
 	}
 }
