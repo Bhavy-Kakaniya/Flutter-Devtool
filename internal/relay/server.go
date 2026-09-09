@@ -16,6 +16,9 @@ func StartServer() error {
 	defer listener.Close() // close when function exists
 	fmt.Println("Relay server listening on port 9000")
 
+	var clients []net.Conn // temporary stores connected clients
+
+	// wait for new clients
 	for {
 		connection, err := listener.Accept() // accept waits until client connects
 
@@ -25,15 +28,38 @@ func StartServer() error {
 		}
 		fmt.Println("Client connected:", connection.RemoteAddr())
 
-		defer connection.Close()
+		clients = append(clients, connection) // add this client to list
+		fmt.Println("Connected clients:", len(clients))
 
-		buffer := make([]byte, 1024) // temporary store bytes from client
-		numberOfBytes, err := connection.Read(buffer)
+		if len(clients) == 2 {
+			fmt.Println("Two client connected, starting relay...")
+			clientA := clients[0]
+			clientB := clients[1]
 
-		if err != nil {
-			fmt.Println("Failed to read from client:", err)
-			continue
+			go forward(clientA, clientB)
+			go forward(clientB, clientA)
+
+			clients = nil // reset client list so another pair can be created later
 		}
-		fmt.Println("Recieved:", string(buffer[:numberOfBytes])) // convert received bytes into string
+	}
+}
+
+// forward continuosly copies data from one connection to another
+func forward(source net.Conn, destination net.Conn) {
+	buffer := make([]byte, 4096) // store incoming bytes
+
+	for {
+		numberOfBytes, err := source.Read(buffer)
+		if err != nil {
+			fmt.Println("Connection closed:", source.RemoteAddr())
+			return
+		}
+
+		_, err = destination.Write(buffer[:numberOfBytes])
+		if err != nil {
+			fmt.Println("Failed to forward data:", err)
+			return
+		}
+
 	}
 }

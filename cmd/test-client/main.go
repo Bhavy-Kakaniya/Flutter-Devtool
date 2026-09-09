@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"log"
 	"net"
+	"os"
 )
 
 func main() {
@@ -15,12 +18,40 @@ func main() {
 
 	fmt.Println("Connected to relay server")
 
-	// writing msg to TCP connection
-	_, err = connection.Write([]byte("Hello from flutter devtool"))
+	go func() {
+		buffer := make([]byte, 4096)
 
-	if err != nil {
-		fmt.Println("Failed to send message:", err)
-		return
+		for {
+			numberOfBytes, err := connection.Read(buffer)
+			if err != nil {
+				fmt.Println("Connection closed")
+				return
+			}
+
+			fmt.Println("Recieved:", string(buffer[:numberOfBytes]))
+			fmt.Print("> ")
+		}
+	}()
+
+	//read input by user
+	scanner := bufio.NewScanner(os.Stdin)
+
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
 	}
-	fmt.Println("Message sent")
+
+	for {
+		fmt.Print("> ")
+		if !scanner.Scan() {
+			return
+		}
+
+		message := scanner.Text()
+		_, err := connection.Write([]byte(message))
+
+		if err != nil {
+			fmt.Println("Failed to send message:", err)
+			return
+		}
+	}
 }
