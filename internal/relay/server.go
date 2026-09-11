@@ -14,9 +14,9 @@ func StartServer() error {
 	}
 
 	defer listener.Close() // close when function exits
-	fmt.Println("Relay server listening on port 9000")
 
-	sessionId := 1 // give every session unique number
+	manager := NewSessionManager()
+	fmt.Println("Relay server listening on port 9000")
 
 	// keep accepting clients
 	for {
@@ -28,25 +28,20 @@ func StartServer() error {
 		}
 		fmt.Println("Client connected:", connection.RemoteAddr())
 
-		session := NewSession(sessionId)
-		sessionId++
-		session.AddClient(connection)
+		// handle this client in its own goroutine
+		// the main server goroutine immediately goes back to Accept() and can accept other clients
+		go handleConnection(manager, connection)
+	}
+}
 
-		fmt.Println("Waiting for second client for session", session.ID)
+// handle connection handles one client connection
 
-		secondConnection, err := listener.Accept()
+func handleConnection(manager *SessionManager, connection net.Conn) {
+	session := manager.AddClient(connection) // add client to appropriate session
+	fmt.Println("Client joined session:", session.ID)
 
-		if err != nil {
-			fmt.Println("Failed to accept second client", err)
-			session.Close()
-			continue
-		}
-		fmt.Println("Client connected:", secondConnection.RemoteAddr())
-
-		session.AddClient(secondConnection)
-		if session.IsReady() {
-			fmt.Println("Both clients are connected to session", session.ID)
-			session.StartRelay()
-		}
+	if session.IsReady() {
+		fmt.Println("Both clients are connected to session", session.ID)
+		session.StartRelay()
 	}
 }
