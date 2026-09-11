@@ -7,8 +7,8 @@ import (
 )
 
 // Session represents one communication channel between two clients
-// These two clients will be 
-// Client A = developer's laptop 
+// These two clients will be
+// Client A = developer's laptop
 // Client B = Android device/agent
 // currently they are only 2 tcp clients
 
@@ -19,6 +19,8 @@ type Session struct {
 	mu      sync.Mutex
 	// mu protects session from concurrent acess, multiple goroutines work with session at same time
 	// this prevents race condition
+	removeCallback func(int) // called when session is closed
+	closed         bool
 }
 
 func NewSession(id int) *Session {
@@ -56,14 +58,19 @@ func (s *Session) StartRelay() {
 	clientB := s.clientB
 	s.mu.Unlock()
 
-	go forward(clientA, clientB)
-	go forward(clientB, clientA)
+	go s.forward(clientA, clientB)
+	go s.forward(clientB, clientA)
 	fmt.Println("Session", s.ID, "is now relaying")
 }
 
-func (s *Session) Close () {
+func (s *Session) Close() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+
+	if s.closed {
+		s.mu.Unlock()
+		return
+	}
+	s.closed = true
 
 	if s.clientA != nil {
 		s.clientA.Close()
@@ -74,10 +81,20 @@ func (s *Session) Close () {
 		s.clientB = nil
 	}
 
+	// save callback locally
+	// do this while holding lock so another goroutine cannot change callback while is is being used
+	removeCallback := s.removeCallback
+
+	s.mu.Unlock()
 	fmt.Println("Session", s.ID, "closed")
+
+	// notify SessionManager after releasing session lock
+	if removeCallback != nil {
+		removeCallback(s.ID)
+	}
 }
 
-func forward(source net.Conn, destination net.Conn) {
+func (s *Session) forward(source net.Conn, destination net.Conn) {
 	buffer := make([]byte, 4096) // store incoming bytes
 
 	for {
@@ -86,16 +103,14 @@ func forward(source net.Conn, destination net.Conn) {
 		// close both source and destination
 		if err != nil {
 			fmt.Println("Connection closed:", source.RemoteAddr())
-			source.Close()
-			destination.Close()
+			s.Close()
 			return
 		}
 
 		_, err = destination.Write(buffer[:numberOfBytes])
 		if err != nil {
 			fmt.Println("Failed to forward data:", err)
-			source.Close()
-			destination.Close()
+			s.Close()
 			return
 		}
 	}

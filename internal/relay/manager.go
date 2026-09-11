@@ -61,9 +61,11 @@ func (manager *SessionManager) AddClient(connection net.Conn) *Session {
 	// no existing session had empty slot
 
 	session := NewSession(manager.nextSessionID) // new session with next available id
-	manager.nextSessionID++                      // get another id for new session
-	manager.sessions[session.ID] = session       // add this session to map
-	session.AddClient(connection)                // add client to new session
+	// session1 gets callback that this is function which should be calleed when this session need to be remove
+	session.removeCallback = manager.RemoveSession // notify manager that session has been expired
+	manager.nextSessionID++                        // get another id for new session
+	manager.sessions[session.ID] = session         // add this session to map
+	session.AddClient(connection)                  // add client to new session
 	fmt.Println("Created new session:", session.ID)
 	return session
 }
