@@ -20,6 +20,7 @@ type Session struct {
 	// mu protects session from concurrent acess, multiple goroutines work with session at same time
 	// this prevents race condition
 	removeCallback func(int) // called when session is closed
+	started        bool
 	closed         bool
 }
 
@@ -54,6 +55,16 @@ func (s *Session) IsReady() bool {
 
 func (s *Session) StartRelay() {
 	s.mu.Lock() // lock while reading client interface
+	if s.started {
+		s.mu.Unlock()
+		return
+	}
+	if s.clientA == nil || s.clientB == nil {
+		s.mu.Unlock()
+		return
+	}
+	s.started = true
+
 	clientA := s.clientA
 	clientB := s.clientB
 	s.mu.Unlock()
