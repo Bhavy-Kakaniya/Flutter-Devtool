@@ -14,6 +14,7 @@ import (
 
 type Session struct {
 	ID      int
+	Code    string
 	clientA net.Conn
 	clientB net.Conn
 	mu      sync.Mutex
@@ -26,7 +27,8 @@ type Session struct {
 
 func NewSession(id int) *Session {
 	return &Session{
-		ID: id,
+		ID:   id,
+		Code: fmt.Sprintf("Session-%d", id),
 	}
 }
 
