@@ -24,7 +24,8 @@ type SessionManager struct {
 	// sessions stores every active session
 	// The key is the session ID
 	// Example:  1 = Session 1,  2 = Session 2
-	sessions map[int]*Session
+	sessions       map[int]*Session
+	sessionsByCode map[string]*Session
 
 	nextSessionID int // generate unique id for every newly created session
 
@@ -36,8 +37,9 @@ func NewSessionManager() *SessionManager {
 
 	// create manager
 	return &SessionManager{
-		sessions:      make(map[int]*Session),
-		nextSessionID: 1,
+		sessions:       make(map[int]*Session),
+		sessionsByCode: make(map[string]*Session),
+		nextSessionID:  1,
 	}
 }
 
@@ -61,12 +63,13 @@ func (manager *SessionManager) AddClient(connection net.Conn) *Session {
 	// no existing session had empty slot
 
 	session := NewSession(manager.nextSessionID) // new session with next available id
+	manager.sessionsByCode[session.Code] = session
 	// session1 gets callback that this is function which should be calleed when this session need to be remove
 	session.removeCallback = manager.RemoveSession // notify manager that session has been expired
 	manager.nextSessionID++                        // get another id for new session
 	manager.sessions[session.ID] = session         // add this session to map
 	session.AddClient(connection)                  // add client to new session
-	fmt.Println("Created new session:", session.ID)
+	fmt.Println("Created new session:", session.ID, "Code:", session.Code)
 	return session
 }
 
@@ -78,4 +81,10 @@ func (manager *SessionManager) RemoveSession(sessionID int) {
 
 	delete(manager.sessions, sessionID) // remove session from map
 	fmt.Println("Removed session:", sessionID)
+}
+
+func (manager *SessionManager) GetSessionByCode(code string) *Session{
+	manager.mu.Lock()
+	defer manager.mu.Unlock()
+	return  manager.sessionsByCode[code]
 }
