@@ -13,17 +13,24 @@ import (
 // currently they are only 2 tcp clients
 
 type Session struct {
-	ID      int
-	Code    string
-	clientA net.Conn
-	clientB net.Conn
-	mu      sync.Mutex
+	ID     int
+	Code   string
+	Laptop net.Conn
+	Phone  net.Conn
+	mu     sync.Mutex
 	// mu protects session from concurrent acess, multiple goroutines work with session at same time
 	// this prevents race condition
 	removeCallback func(int) // called when session is closed
 	started        bool
 	closed         bool
 }
+
+type ClientRole string
+
+const (
+	Laptop ClientRole = "LAPTOP"
+	Phone  ClientRole = "PHONE"
+)
 
 func NewSession(id int) *Session {
 	return &Session{
@@ -32,27 +39,38 @@ func NewSession(id int) *Session {
 	}
 }
 
-func (s *Session) AddClient(connection net.Conn) bool {
-	s.mu.Lock()         // lock session before modifying its fields
-	defer s.mu.Unlock() // unlock when function finishes
+func (s *Session) AddClient(connection net.Conn, role ClientRole) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	if s.clientA == nil {
-		s.clientA = connection
-		fmt.Println("client joined session", s.ID, "as client A")
+	if role == Laptop {
+		// can have only one laptop connection
+		if s.Laptop != nil {
+			return false
+		}
+
+		s.Laptop = connection
+		fmt.Println("Client joined session", s.ID, "as LAPTOP")
 		return true
 	}
-	if s.clientB == nil {
-		s.clientB = connection
-		fmt.Println("client joined session", s.ID, "as client B")
+
+	if role == Phone {
+		// can have only one phone connection
+		if s.Phone != nil {
+			return false
+		}
+
+		s.Phone = connection
+		fmt.Println("Client joined session", s.ID, "as PHONE")
 		return true
 	}
-	return false
+	return false // Unknown role
 }
 
 func (s *Session) IsReady() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.clientA != nil && s.clientB != nil
+	return s.Laptop != nil && s.Phone != nil
 }
 
 func (s *Session) StartRelay() {
@@ -61,18 +79,18 @@ func (s *Session) StartRelay() {
 		s.mu.Unlock()
 		return
 	}
-	if s.clientA == nil || s.clientB == nil {
+	if s.Laptop == nil || s.Phone == nil {
 		s.mu.Unlock()
 		return
 	}
 	s.started = true
 
-	clientA := s.clientA
-	clientB := s.clientB
+	Laptop := s.Laptop
+	Phone := s.Phone
 	s.mu.Unlock()
 
-	go s.forward(clientA, clientB)
-	go s.forward(clientB, clientA)
+	go s.forward(Laptop, Phone)
+	go s.forward(Phone, Laptop)
 	fmt.Println("Session", s.ID, "is now relaying")
 }
 
@@ -85,13 +103,13 @@ func (s *Session) Close() {
 	}
 	s.closed = true
 
-	if s.clientA != nil {
-		s.clientA.Close()
-		s.clientA = nil
+	if s.Laptop != nil {
+		s.Laptop.Close()
+		s.Laptop = nil
 	}
-	if s.clientB != nil {
-		s.clientB.Close()
-		s.clientB = nil
+	if s.Phone != nil {
+		s.Phone.Close()
+		s.Phone = nil
 	}
 
 	// save callback locally

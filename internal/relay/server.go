@@ -1,8 +1,10 @@
 package relay
 
 import (
+	"bufio"
 	"fmt"
 	"net"
+	"strings"
 )
 
 func StartServer() error {
@@ -35,9 +37,22 @@ func StartServer() error {
 }
 
 // handle connection handles one client connection
-
 func handleConnection(manager *SessionManager, connection net.Conn) {
-	session := manager.AddClient(connection) // add client to appropriate session
+	reader := bufio.NewReader(connection)
+
+	role, err := reader.ReadString('\n') // \n ensures that msg is finished
+
+	if err != nil {
+		fmt.Println("Failed to read client role:", err)
+		connection.Close()
+		return
+	}
+
+	role = strings.TrimSpace(role)
+	fmt.Println("Client role:", role)
+
+	session := manager.AddClient(connection, ClientRole(role)) // add client to appropriate session	
+
 	fmt.Println("Client joined session:", session.ID)
 
 	if session.IsReady() {

@@ -14,6 +14,13 @@ func main() {
 		fmt.Println("Failed to connect to relay:", err)
 		return
 	}
+
+	_, err = connection.Write([]byte("Phone\n"))
+	if err != nil {
+		fmt.Println("Failed to send role:", err)
+		return
+	}
+
 	defer connection.Close()
 
 	fmt.Println("Connected to relay server")

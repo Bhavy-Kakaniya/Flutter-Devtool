@@ -47,28 +47,31 @@ func NewSessionManager() *SessionManager {
 // if existing session has only one client new client joins that session
 // if no available session exists new session is created
 // it returns the session the client joined
-
-func (manager *SessionManager) AddClient(connection net.Conn) *Session {
-	manager.mu.Lock() // lock manager as it is going to be read/write shared session state
-
+func (manager *SessionManager) AddClient(connection net.Conn, role ClientRole) *Session {
+	manager.mu.Lock()
 	defer manager.mu.Unlock()
 
 	for _, session := range manager.sessions {
-		// from all existing sessions try to add client to this session
-		// accessing is safe as addclient has its own mutex
-		if session.AddClient(connection) {
+		// Try to add this client to an existing session
+		// The role tells the session whether this is the laptop or phone
+		if session.AddClient(connection, role) {
 			return session
 		}
 	}
-	// no existing session had empty slot
+	// No existing session had an available slot for this role.
 
-	session := NewSession(manager.nextSessionID) // new session with next available id
-	manager.sessionsByCode[session.Code] = session
-	// session1 gets callback that this is function which should be calleed when this session need to be remove
-	session.removeCallback = manager.RemoveSession // notify manager that session has been expired
-	manager.nextSessionID++                        // get another id for new session
-	manager.sessions[session.ID] = session         // add this session to map
-	session.AddClient(connection)                  // add client to new session
+	session := NewSession(manager.nextSessionID)
+
+	manager.sessionsByCode[session.Code] = session // Store the session using its stable code
+
+	session.removeCallback = manager.RemoveSession // Give the session a callback so it can ask the manager to remove it
+
+	manager.nextSessionID++ // Prepare the ID for the next newly created session
+
+	manager.sessions[session.ID] = session // Store the new session by its internal ID
+
+	session.AddClient(connection, role) // Add the client to the appropriate side of the session
+
 	fmt.Println("Created new session:", session.ID, "Code:", session.Code)
 	return session
 }
@@ -83,8 +86,8 @@ func (manager *SessionManager) RemoveSession(sessionID int) {
 	fmt.Println("Removed session:", sessionID)
 }
 
-func (manager *SessionManager) GetSessionByCode(code string) *Session{
+func (manager *SessionManager) GetSessionByCode(code string) *Session {
 	manager.mu.Lock()
 	defer manager.mu.Unlock()
-	return  manager.sessionsByCode[code]
+	return manager.sessionsByCode[code]
 }
