@@ -15,7 +15,7 @@ func main() {
 		return
 	}
 
-	_, err = connection.Write([]byte("Phone\n"))
+	_, err = connection.Write([]byte("LAPTOP\n"))
 	if err != nil {
 		fmt.Println("Failed to send role:", err)
 		return
