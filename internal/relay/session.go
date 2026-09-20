@@ -134,7 +134,7 @@ func (s *Session) forward(source net.Conn, destination net.Conn) {
 		// close both source and destination
 		if err != nil {
 			fmt.Println("Connection closed:", source.RemoteAddr())
-			s.Close()
+			s.RemoveClient(source)
 			return
 		}
 
@@ -144,5 +144,21 @@ func (s *Session) forward(source net.Conn, destination net.Conn) {
 			s.Close()
 			return
 		}
+	}
+}
+
+func (s *Session)RemoveClient (connection net.Conn) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.Laptop == connection {
+		s.Laptop = nil
+		s.started = false
+		fmt.Println("Laptop disconnected from session", s.ID)
+	}
+	if s.Phone == connection {
+		s.Phone = nil
+		s.started = false
+		fmt.Println("Phone disconnected from session", s.ID)
 	}
 }

@@ -9,13 +9,19 @@ import (
 )
 
 func main() {
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: go run ./cmd/test-client [LAPTOP|PHONE]")
+		return
+	}
+	role := os.Args[1]
+
 	connection, err := net.Dial("tcp", "localhost:9000")
 	if err != nil {
 		fmt.Println("Failed to connect to relay:", err)
 		return
 	}
 
-	_, err = connection.Write([]byte("LAPTOP\n"))
+	_, err = connection.Write([]byte(role + "\n"))
 	if err != nil {
 		fmt.Println("Failed to send role:", err)
 		return
