@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -27,6 +28,17 @@ func main() {
 		return
 	}
 
+	reader := bufio.NewReader(connection)
+
+	sessionCode, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Println("Failed to recieve session code:", err)
+		return
+	}
+
+	sessionCode = strings.TrimSpace(sessionCode)
+	fmt.Println("Joined session:", sessionCode)
+
 	defer connection.Close()
 
 	fmt.Println("Connected to relay server")
@@ -35,7 +47,7 @@ func main() {
 		buffer := make([]byte, 4096)
 
 		for {
-			numberOfBytes, err := connection.Read(buffer)
+			numberOfBytes, err := reader.Read(buffer)
 			if err != nil {
 				fmt.Println("Connection closed")
 				return

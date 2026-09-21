@@ -52,8 +52,14 @@ func handleConnection(manager *SessionManager, connection net.Conn) {
 	fmt.Println("Client role:", role)
 
 	session := manager.AddClient(connection, ClientRole(role)) // add client to appropriate session	
-
 	fmt.Println("Client joined session:", session.ID)
+
+	_, err = connection.Write([]byte(session.Code + "\n"))
+	if err != nil {
+		fmt.Println("Failed to send session code:", err)
+		connection.Close()
+		return
+	}
 
 	if session.IsReady() {
 		fmt.Println("Both clients are connected to session", session.ID)
