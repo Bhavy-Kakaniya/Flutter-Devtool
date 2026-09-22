@@ -77,12 +77,24 @@ func (manager *SessionManager) AddClient(connection net.Conn, role ClientRole) *
 }
 
 // RemoveSession removes session from manager
-
 func (manager *SessionManager) RemoveSession(sessionID int) {
 	manager.mu.Lock()
 	defer manager.mu.Unlock()
 
-	delete(manager.sessions, sessionID) // remove session from map
+	// Find the session before deleting it.
+	session, exists := manager.sessions[sessionID]
+
+	// If the session does not exist, there is nothing to remove.
+	if !exists {
+		return
+	}
+
+	// Remove the session from the ID-based map.
+	delete(manager.sessions, sessionID)
+
+	// Also remove the same session from the code-based map.
+	delete(manager.sessionsByCode, session.Code)
+
 	fmt.Println("Removed session:", sessionID)
 }
 
