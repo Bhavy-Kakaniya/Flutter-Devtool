@@ -77,6 +77,6 @@ Interface: 10.145.201.101 --- 0x2b
   239.255.255.250       01-00-5e-7f-ff-fa     static    
   255.255.255.255       ff-ff-ff-ff-ff-ff     static 
 
-==> Conclusion: laptop can ping 10.235.157.208, ARP does not prove that 10.235.157.208 is the phone itself
+==> Conclusion: laptop can ping 10.235.157.208, ARP does not prove that 10.235.157.208 is phone itself
 
 # 
