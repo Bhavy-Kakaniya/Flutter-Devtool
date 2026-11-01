@@ -84,16 +84,12 @@ func (manager *SessionManager) RemoveSession(sessionID int) {
 	// Find the session before deleting it.
 	session, exists := manager.sessions[sessionID]
 
-	// If the session does not exist, there is nothing to remove.
 	if !exists {
 		return
 	}
 
-	// Remove the session from the ID-based map.
 	delete(manager.sessions, sessionID)
-
-	// Also remove the same session from the code-based map.
-	delete(manager.sessionsByCode, session.Code)
+	delete(manager.sessionsByCode, session.Code) // also remove the same session from the code-based map
 
 	fmt.Println("Removed session:", sessionID)
 }
@@ -102,4 +98,20 @@ func (manager *SessionManager) GetSessionByCode(code string) *Session {
 	manager.mu.Lock()
 	defer manager.mu.Unlock()
 	return manager.sessionsByCode[code]
+}
+
+// Laptop disconnects from Session-1
+// Phone --> Relay --> Session-1, Laptop: nil
+// Laptop reconnects: Session-1, Laptop: new connection, Phone: existing connection
+
+func (manager *SessionManager) RecconectClient(connection net.Conn, code string, role ClientRole) *Session {
+	session := manager.GetSessionByCode(code)
+	if session == nil {
+		return nil
+	}
+	if !session.AddClient(connection, role) {
+		return nil
+	}
+	fmt.Println("Client reconnected to session:", session.ID)
+	return session
 }
