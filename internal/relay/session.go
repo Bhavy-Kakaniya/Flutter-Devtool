@@ -147,17 +147,25 @@ func (s *Session) forward(source net.Conn, destination net.Conn) {
 	}
 }
 
-func (s *Session)RemoveClient (connection net.Conn) {
+func (s *Session) RemoveClient(connection net.Conn) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.Laptop == connection {
 		s.Laptop = nil
+		if s.Phone != nil {
+			s.Phone.Close()
+			s.Phone = nil
+		}
 		s.started = false
 		fmt.Println("Laptop disconnected from session", s.ID)
 	}
 	if s.Phone == connection {
 		s.Phone = nil
+		if s.Laptop != nil {
+			s.Laptop.Close()
+			s.Laptop = nil
+		}
 		s.started = false
 		fmt.Println("Phone disconnected from session", s.ID)
 	}
