@@ -18,7 +18,7 @@ func TestReconnectClient(t *testing.T) {
 
 	session := manager.AddClient(laptop, Laptop)
 	manager.AddClient(phone, Phone)
-	session.RemoveClient(laptop)
+	session.RemoveClient(laptop, session.generation)
 
 	newLaptop, newLaptopPeer :=  net.Pipe()
 	defer newLaptop.Close()

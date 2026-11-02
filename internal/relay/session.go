@@ -23,6 +23,7 @@ type Session struct {
 	removeCallback func(int) // called when session is closed
 	started        bool
 	closed         bool
+	generation     uint64
 }
 
 type ClientRole string
@@ -74,7 +75,7 @@ func (s *Session) IsReady() bool {
 }
 
 func (s *Session) StartRelay() {
-	s.mu.Lock() // lock while reading client interface
+	s.mu.Lock()
 	if s.started {
 		s.mu.Unlock()
 		return
@@ -85,12 +86,15 @@ func (s *Session) StartRelay() {
 	}
 	s.started = true
 
+	// create new identity for relay startup save current gen number 
+	s.generation++
+	generation := s.generation
 	Laptop := s.Laptop
 	Phone := s.Phone
 	s.mu.Unlock()
 
-	go s.forward(Laptop, Phone)
-	go s.forward(Phone, Laptop)
+	go s.forward(Laptop, Phone, generation)
+	go s.forward(Phone, Laptop, generation)
 	fmt.Println("Session", s.ID, "is now relaying")
 }
 
@@ -125,7 +129,7 @@ func (s *Session) Close() {
 	}
 }
 
-func (s *Session) forward(source net.Conn, destination net.Conn) {
+func (s *Session) forward(source net.Conn, destination net.Conn, generation uint64) {
 	buffer := make([]byte, 4096) // store incoming bytes
 
 	for {
@@ -134,7 +138,7 @@ func (s *Session) forward(source net.Conn, destination net.Conn) {
 		// close both source and destination
 		if err != nil {
 			fmt.Println("Connection closed:", source.RemoteAddr())
-			s.RemoveClient(source)
+			s.RemoveClient(source, generation)
 			return
 		}
 
@@ -147,9 +151,14 @@ func (s *Session) forward(source net.Conn, destination net.Conn) {
 	}
 }
 
-func (s *Session) RemoveClient(connection net.Conn) {
+func (s *Session) RemoveClient(connection net.Conn, generation uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// ignore cleanup from older relay generation
+	if generation != s.generation {
+		return
+	}
 
 	if s.Laptop == connection {
 		s.Laptop = nil
