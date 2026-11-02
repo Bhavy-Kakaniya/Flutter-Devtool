@@ -29,7 +29,7 @@ func TestReconnectClient(t *testing.T) {
 	defer newLaptop.Close()
 	defer newLaptopPeer.Close()
 
-	reconnectedSession := manager.RecconectClient(newLaptop, session.Code, Laptop)
+	reconnectedSession := manager.ReconectClient(newLaptop, session.Code, Laptop)
 	if reconnectedSession == nil{
 		t.Fatal("Expected laptop to reconnect, got nil")
 	}
@@ -41,6 +41,13 @@ func TestReconnectClient(t *testing.T) {
 	if reconnectedSession.Laptop != newLaptop {
 		t.Fatal("Expected session to ready after reconnection")
 	}
+
+	currentGeneration := session.generation
+	session.RemoveClient(laptop, currentGeneration - 1)
+	if session.Laptop != newLaptop {
+		t.Fatal("Old relay removed the new laptop connection")
+	}
+
 	if reconnectedSession.Phone != nil {
 		t.Fatal("Expected phone connection to be nil")
 	}
@@ -49,7 +56,7 @@ func TestReconnectClient(t *testing.T) {
 	defer newPhone.Close()
 	defer newPhonePeer.Close()
 
-	reconnectedPhoneSession := manager.RecconectClient(newPhone, session.Code, Phone)
+	reconnectedPhoneSession := manager.ReconectClient(newPhone, session.Code, Phone)
 
 	if reconnectedPhoneSession == nil {
 		t.Fatal("Expected phone to reconnect, got nil")
