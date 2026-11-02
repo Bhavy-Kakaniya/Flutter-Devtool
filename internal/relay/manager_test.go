@@ -20,6 +20,11 @@ func TestReconnectClient(t *testing.T) {
 	manager.AddClient(phone, Phone)
 	session.RemoveClient(laptop, session.generation)
 
+	_, err := phonePeer.Write([]byte("test"))
+	if err == nil {
+		t.Fatal("Expected old phone connection to be closed")
+	}
+
 	newLaptop, newLaptopPeer :=  net.Pipe()
 	defer newLaptop.Close()
 	defer newLaptopPeer.Close()
