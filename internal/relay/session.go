@@ -160,21 +160,16 @@ func (s *Session) RemoveClient(connection net.Conn, generation uint64) {
 		return
 	}
 
+	// remove only laptop that actually disconnected
 	if s.Laptop == connection {
 		s.Laptop = nil
-		if s.Phone != nil {
-			s.Phone.Close()
-			s.Phone = nil
-		}
 		s.started = false
 		fmt.Println("Laptop disconnected from session", s.ID)
 	}
+
+	// remove only phone that actually disconnected
 	if s.Phone == connection {
 		s.Phone = nil
-		if s.Laptop != nil {
-			s.Laptop.Close()
-			s.Laptop = nil
-		}
 		s.started = false
 		fmt.Println("Phone disconnected from session", s.ID)
 	}
