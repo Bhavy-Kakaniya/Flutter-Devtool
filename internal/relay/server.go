@@ -42,13 +42,30 @@ func parseHandshake(message string) (command string, code string, role ClientRol
 		return "", "", ""
 	}
 	if len(parts) == 1 {
-		return "NEW", "", ClientRole(parts[0])
+		role := ClientRole(parts[0])
+
+		if role == Laptop || role == Phone {
+			return "NEW", "", role
+		}
+		return "", "", ""
 	}
-	if len(parts) == 2 && parts[0] == "NEW"{
-		return "NEW", "", ClientRole(parts[1])
+	if len(parts) == 2 && parts[0] == "NEW" {
+		role := ClientRole(parts[1])
+
+		if role == Laptop || role == Phone {
+			return "NEW", "", role
+		}
+
+		return "", "", ""
 	}
 	if len(parts) == 3 && parts[0] == "RECONNECT" {
-		return "RECONNECT", parts[1], ClientRole(parts[2])
+		role := ClientRole(parts[2])
+
+		if role == Laptop || role == Phone {
+			return "RECONNECT", parts[1], role
+		}
+
+		return "", "", ""
 	}
 	return "", "", ""
 }
@@ -68,7 +85,7 @@ func handleConnection(manager *SessionManager, connection net.Conn) {
 	role = strings.TrimSpace(role)
 	fmt.Println("Client role:", role)
 
-	session := manager.AddClient(connection, ClientRole(role)) // add client to appropriate session	
+	session := manager.AddClient(connection, ClientRole(role)) // add client to appropriate session
 	fmt.Println("Client joined session:", session.ID)
 
 	_, err = connection.Write([]byte(session.Code + "\n"))
