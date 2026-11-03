@@ -71,30 +71,59 @@ func parseHandshake(message string) (command string, code string, role ClientRol
 }
 
 // handle connection handles one client connection
+
 func handleConnection(manager *SessionManager, connection net.Conn) {
 	reader := bufio.NewReader(connection)
 
-	role, err := reader.ReadString('\n') // \n ensures that msg is finished
-
+	// Read the client's handshake.
+	message, err := reader.ReadString('\n')
 	if err != nil {
-		fmt.Println("Failed to read client role:", err)
+		fmt.Println("Failed to read handshake:", err)
 		connection.Close()
 		return
 	}
 
-	role = strings.TrimSpace(role)
-	fmt.Println("Client role:", role)
+	// Parse the handshake into its components.
+	command, code, role := parseHandshake(strings.TrimSpace(message))
 
-	session := manager.AddClient(connection, ClientRole(role)) // add client to appropriate session
+	// Reject invalid handshake formats.
+	if command == "" {
+		fmt.Println("Invalid handshake:", message)
+		connection.Close()
+		return
+	}
+
+	// Handle initial pairing or reconnection.
+	var session *Session
+
+	if command == "NEW" {
+		session = manager.AddClient(connection, role)
+	}
+
+	if command == "RECONNECT" {
+		session = manager.ReconnectClient(connection, code, role)
+	}
+
+	// Reject clients that could not join a session.
+	if session == nil {
+		fmt.Println("Failed to join session:", code)
+		connection.Write([]byte("ERROR\n"))
+		connection.Close()
+		return
+	}
+
 	fmt.Println("Client joined session:", session.ID)
 
+	// Send the session code to the client.
 	_, err = connection.Write([]byte(session.Code + "\n"))
 	if err != nil {
 		fmt.Println("Failed to send session code:", err)
+		session.RemoveClient(connection, session.generation)
 		connection.Close()
 		return
 	}
 
+	// Start relaying when both clients are connected.
 	if session.IsReady() {
 		fmt.Println("Both clients are connected to session", session.ID)
 		session.StartRelay()

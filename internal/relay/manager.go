@@ -104,7 +104,7 @@ func (manager *SessionManager) GetSessionByCode(code string) *Session {
 // Phone --> Relay --> Session-1, Laptop: nil
 // Laptop reconnects: Session-1, Laptop: new connection, Phone: existing connection
 
-func (manager *SessionManager) ReconectClient(connection net.Conn, code string, role ClientRole) *Session {
+func (manager *SessionManager) ReconnectClient(connection net.Conn, code string, role ClientRole) *Session {
 	session := manager.GetSessionByCode(code)
 	if session == nil {
 		return nil

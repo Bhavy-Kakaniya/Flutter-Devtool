@@ -29,7 +29,7 @@ func TestReconnectClient(t *testing.T) {
 	defer newLaptop.Close()
 	defer newLaptopPeer.Close()
 
-	reconnectedSession := manager.ReconectClient(newLaptop, session.Code, Laptop)
+	reconnectedSession := manager.ReconnectClient(newLaptop, session.Code, Laptop)
 	if reconnectedSession == nil{
 		t.Fatal("Expected laptop to reconnect, got nil")
 	}
@@ -56,7 +56,7 @@ func TestReconnectClient(t *testing.T) {
 	defer newPhone.Close()
 	defer newPhonePeer.Close()
 
-	reconnectedPhoneSession := manager.ReconectClient(newPhone, session.Code, Phone)
+	reconnectedPhoneSession := manager.ReconnectClient(newPhone, session.Code, Phone)
 
 	if reconnectedPhoneSession == nil {
 		t.Fatal("Expected phone to reconnect, got nil")
