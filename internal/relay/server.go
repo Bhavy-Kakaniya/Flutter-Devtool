@@ -36,6 +36,23 @@ func StartServer() error {
 	}
 }
 
+func parseHandshake(message string) (command string, code string, role ClientRole) {
+	parts := strings.Fields(message)
+	if len(parts) == 0 {
+		return "", "", ""
+	}
+	if len(parts) == 1 {
+		return "NEW", "", ClientRole(parts[0])
+	}
+	if len(parts) == 2 && parts[0] == "NEW"{
+		return "NEW", "", ClientRole(parts[1])
+	}
+	if len(parts) == 3 && parts[0] == "RECONNECT" {
+		return "RECONNECT", parts[1], ClientRole(parts[2])
+	}
+	return "", "", ""
+}
+
 // handle connection handles one client connection
 func handleConnection(manager *SessionManager, connection net.Conn) {
 	reader := bufio.NewReader(connection)
