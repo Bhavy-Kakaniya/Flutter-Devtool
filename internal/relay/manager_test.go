@@ -39,15 +39,12 @@ func TestReconnectClient(t *testing.T) {
 	if !session.IsReady() {
 		t.Fatal("expected session to be ready after laptop reconnect")
 	}
-	// Disconnect the phone explicitly before reconnecting it.
 	session.RemoveClient(phone, session.generation)
 
-	// Verify the laptop remains connected.
 	if session.Laptop != newLaptop {
 		t.Fatal("Expected laptop to remain connected after phone disconnect")
 	}
 
-	// Verify the phone has been removed.
 	if session.Phone != nil {
 		t.Fatal("Expected phone to be disconnected")
 	}

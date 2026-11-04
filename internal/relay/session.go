@@ -155,19 +155,16 @@ func (s *Session) RemoveClient(connection net.Conn, generation uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// ignore cleanup from older relay generation
 	if generation != s.generation {
 		return
 	}
 
-	// remove only laptop that actually disconnected
 	if s.Laptop == connection {
 		s.Laptop = nil
 		s.started = false
 		fmt.Println("Laptop disconnected from session", s.ID)
 	}
 
-	// remove only phone that actually disconnected
 	if s.Phone == connection {
 		s.Phone = nil
 		s.started = false

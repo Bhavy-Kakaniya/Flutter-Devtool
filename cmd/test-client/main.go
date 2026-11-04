@@ -89,9 +89,17 @@ func main() {
 		if !scanner.Scan() {
 			return
 		}
-
 		message := scanner.Text()
+		if message == "/disconnect" {
+			manager.Disconnect()
+			fmt.Println("Simulated network disconnection")
+			continue
+		}
 		err := manager.Send(message)
+		if err != nil {
+			fmt.Println("Failed to send message:", err)
+			continue
+		}
 		if err != nil {
 			fmt.Println("Failed to send message:", err)
 			return
@@ -163,4 +171,16 @@ func (manager *connectionManager) Reader() *bufio.Reader {
 	manager.mu.Lock()
 	defer manager.mu.Unlock()
 	return manager.reader
+}
+
+func (manager *connectionManager) Disconnect() {
+	manager.mu.Lock()
+	connection := manager.conn
+	manager.conn = nil
+	manager.reader = nil
+
+	manager.mu.Unlock()
+	if connection != nil {
+		connection.Close()
+	}
 }
