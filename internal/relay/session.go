@@ -26,6 +26,8 @@ type Session struct {
 	generation          uint64
 	laptopReaderStarted bool
 	phoneReaderStarted  bool
+	laptopMessageQueue  [][]byte
+	phoneMessageQueue   [][]byte
 }
 
 type ClientRole string
@@ -191,3 +193,30 @@ func (s *Session) RemoveClientByRole(connection net.Conn, role ClientRole) {
 		fmt.Println("Phone disconnected from session", s.ID)
 	}
 }
+
+func (s *Session) flushQueueLocked(destination net.Conn, role ClientRole) error {
+	var queue *[][]byte
+	if role == Laptop {
+		queue = &s.laptopMessageQueue
+	} else if role == Phone {
+		queue = &s.phoneMessageQueue
+	} else {
+		return fmt.Errorf("invalid client role")
+	}
+	for len(*queue) > 0 {
+		message := (*queue)[0]
+		for len(message) > 0 {
+			numberOfBytes, err := destination.Write(message)
+			if err != nil {
+				return err
+			}
+			if numberOfBytes == 0 {
+				return fmt.Errorf("connection wrote zero bytes")
+			}
+			message = message[numberOfBytes:]
+		}
+		*queue = (*queue)[1:]
+	}
+	return nil
+}
+
