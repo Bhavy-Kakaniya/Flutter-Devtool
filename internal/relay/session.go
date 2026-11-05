@@ -20,10 +20,12 @@ type Session struct {
 	mu     sync.Mutex
 	// mu protects session from concurrent acess, multiple goroutines work with session at same time
 	// this prevents race condition
-	removeCallback func(int) // called when session is closed
-	started        bool
-	closed         bool
-	generation     uint64
+	removeCallback      func(int) // called when session is closed
+	started             bool
+	closed              bool
+	generation          uint64
+	laptopReaderStarted bool
+	phoneReaderStarted  bool
 }
 
 type ClientRole string
@@ -40,32 +42,27 @@ func NewSession(id int) *Session {
 	}
 }
 
+// assigns connection to its role
 func (s *Session) AddClient(connection net.Conn, role ClientRole) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
 	if role == Laptop {
-		// can have only one laptop connection
 		if s.Laptop != nil {
 			return false
 		}
-
 		s.Laptop = connection
 		fmt.Println("Client joined session", s.ID, "as LAPTOP")
 		return true
 	}
-
 	if role == Phone {
-		// can have only one phone connection
 		if s.Phone != nil {
 			return false
 		}
-
 		s.Phone = connection
 		fmt.Println("Client joined session", s.ID, "as PHONE")
 		return true
 	}
-	return false // Unknown role
+	return false
 }
 
 func (s *Session) IsReady() bool {
@@ -76,25 +73,22 @@ func (s *Session) IsReady() bool {
 
 func (s *Session) StartRelay() {
 	s.mu.Lock()
-	if s.started {
-		s.mu.Unlock()
-		return
-	}
 	if s.Laptop == nil || s.Phone == nil {
 		s.mu.Unlock()
 		return
 	}
+	laptop := s.Laptop
+	phone := s.Phone
+	if !s.laptopReaderStarted {
+		s.laptopReaderStarted = true
+		go s.forward(laptop, Laptop)
+	}
+	if !s.phoneReaderStarted {
+		s.phoneReaderStarted = true
+		go s.forward(phone, Phone)
+	}
 	s.started = true
-
-	// create new identity for relay startup save current gen number 
-	s.generation++
-	generation := s.generation
-	Laptop := s.Laptop
-	Phone := s.Phone
 	s.mu.Unlock()
-
-	go s.forward(Laptop, Phone, generation)
-	go s.forward(Phone, Laptop, generation)
 	fmt.Println("Session", s.ID, "is now relaying")
 }
 
@@ -129,25 +123,34 @@ func (s *Session) Close() {
 	}
 }
 
-func (s *Session) forward(source net.Conn, destination net.Conn, generation uint64) {
-	buffer := make([]byte, 4096) // store incoming bytes
-
+func (s *Session) forward(source net.Conn, role ClientRole) {
+	buffer := make([]byte, 4096)
 	for {
 		numberOfBytes, err := source.Read(buffer)
-
-		// close both source and destination
 		if err != nil {
-			fmt.Println("Connection closed:", source.RemoteAddr())
-			s.RemoveClient(source, generation)
+			fmt.Println("Read failed:", err)
+			s.RemoveClientByRole(source, role)
 			return
 		}
-
+		s.mu.Lock()
+		var destination net.Conn
+		if role == Laptop {
+			destination = s.Phone
+		} else if role == Phone {
+			destination = s.Laptop
+		}
+		s.mu.Unlock()
+		if destination == nil {
+			fmt.Println("Destination unavailable; message dropped")
+			continue
+		}
 		_, err = destination.Write(buffer[:numberOfBytes])
 		if err != nil {
 			fmt.Println("Failed to forward data:", err)
-			s.Close()
-			return
+			destination.Close()
+			continue
 		}
+		fmt.Printf("Forwarded %d bytes from %s\n", numberOfBytes, role)
 	}
 }
 
@@ -167,6 +170,23 @@ func (s *Session) RemoveClient(connection net.Conn, generation uint64) {
 
 	if s.Phone == connection {
 		s.Phone = nil
+		s.started = false
+		fmt.Println("Phone disconnected from session", s.ID)
+	}
+}
+
+func (s *Session) RemoveClientByRole(connection net.Conn, role ClientRole) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if role == Laptop && s.Laptop == connection {
+		s.Laptop = nil
+		s.laptopReaderStarted = false
+		s.started = false
+		fmt.Println("Laptop disconnected from session", s.ID)
+	}
+	if role == Phone && s.Phone == connection {
+		s.Phone = nil
+		s.phoneReaderStarted = false
 		s.started = false
 		fmt.Println("Phone disconnected from session", s.ID)
 	}

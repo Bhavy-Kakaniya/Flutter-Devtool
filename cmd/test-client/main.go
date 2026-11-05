@@ -58,10 +58,9 @@ func main() {
 	fmt.Println("Connected to relay server")
 
 	go func() {
-		buffer := make([]byte, 4096)
 		for {
 			currentReader := manager.Reader()
-			numberOfBytes, err := currentReader.Read(buffer)
+			message, err := currentReader.ReadString('\n')
 			if err != nil {
 				fmt.Println("\nConnection lost. Attempting to reconnect...")
 				newConnection, newReader, reconnectErr := reconnectToRelay(sessionCode, role)
@@ -73,7 +72,8 @@ func main() {
 				fmt.Println("Connection restored.")
 				continue
 			}
-			fmt.Println("Received:", string(buffer[:numberOfBytes]))
+			message = strings.TrimRight(message, "\r\n")
+			fmt.Println("Received:", message)
 			fmt.Print("> ")
 		}
 	}()
@@ -163,6 +163,7 @@ func (manager *connectionManager) Send(message string) error {
 	if manager.conn == nil {
 		return fmt.Errorf("no active connection")
 	}
+	message = message + "\n"
 	_, err := manager.conn.Write([]byte(message))
 	return err
 }
