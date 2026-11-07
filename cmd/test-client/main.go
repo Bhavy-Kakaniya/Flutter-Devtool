@@ -142,7 +142,7 @@ func reconnectToRelay(sessionCode string, role string) (net.Conn, *bufio.Reader,
 			return connection, reader, nil
 		}
 		fmt.Println("Reconnect failed:", err)
-		time.Sleep(2 * time.Second)
+		time.Sleep(15 * time.Second)
 	}
 }
 

@@ -44,7 +44,6 @@ func NewSession(id int) *Session {
 	}
 }
 
-// assigns connection to its role
 func (s *Session) AddClient(connection net.Conn, role ClientRole) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -53,7 +52,11 @@ func (s *Session) AddClient(connection net.Conn, role ClientRole) bool {
 			return false
 		}
 		s.Laptop = connection
+		s.laptopReaderStarted = false
 		fmt.Println("Client joined session", s.ID, "as LAPTOP")
+		if err := s.flushQueueLocked(connection, Laptop); err != nil {
+			fmt.Println("Failed to flush laptop queue:", err)
+		}
 		return true
 	}
 	if role == Phone {
@@ -61,7 +64,11 @@ func (s *Session) AddClient(connection net.Conn, role ClientRole) bool {
 			return false
 		}
 		s.Phone = connection
+		s.phoneReaderStarted = false
 		fmt.Println("Client joined session", s.ID, "as PHONE")
+		if err := s.flushQueueLocked(connection, Phone); err != nil {
+			fmt.Println("Failed to flush phone queue:", err)
+		}
 		return true
 	}
 	return false
@@ -143,7 +150,20 @@ func (s *Session) forward(source net.Conn, role ClientRole) {
 		}
 		s.mu.Unlock()
 		if destination == nil {
-			fmt.Println("Destination unavailable; message dropped")
+			s.mu.Lock()
+			if role == Laptop {
+				s.phoneMessageQueue = append(
+					s.phoneMessageQueue,
+					append([]byte(nil), buffer[:numberOfBytes]...),
+				)
+			} else if role == Phone {
+				s.laptopMessageQueue = append(
+					s.laptopMessageQueue,
+					append([]byte(nil), buffer[:numberOfBytes]...),
+				)
+			}
+			s.mu.Unlock()
+			fmt.Println("Destination unavailable; message queued")
 			continue
 		}
 		_, err = destination.Write(buffer[:numberOfBytes])
@@ -207,16 +227,19 @@ func (s *Session) flushQueueLocked(destination net.Conn, role ClientRole) error 
 		message := (*queue)[0]
 		for len(message) > 0 {
 			numberOfBytes, err := destination.Write(message)
+			message = message[numberOfBytes:]
+			(*queue)[0] = message
+			if len(message) == 0 {
+				*queue = (*queue)[1:]
+			}
 			if err != nil {
 				return err
 			}
 			if numberOfBytes == 0 {
 				return fmt.Errorf("connection wrote zero bytes")
 			}
-			message = message[numberOfBytes:]
 		}
 		*queue = (*queue)[1:]
 	}
 	return nil
 }
-
