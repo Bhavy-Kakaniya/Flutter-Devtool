@@ -123,6 +123,14 @@ func handleConnection(manager *SessionManager, connection net.Conn) {
 		return
 	}
 
+	// Flush queued data only after the client receives its session code.
+	if err := session.FlushQueue(connection, role); err != nil {
+		fmt.Println("Failed to flush queue:", err)
+		session.RemoveClient(connection, session.generation)
+		connection.Close()
+		return
+	}
+
 	// Start relaying when both clients are connected.
 	if session.IsReady() {
 		fmt.Println("Both clients are connected to session", session.ID)

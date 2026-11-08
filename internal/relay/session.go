@@ -54,9 +54,6 @@ func (s *Session) AddClient(connection net.Conn, role ClientRole) bool {
 		s.Laptop = connection
 		s.laptopReaderStarted = false
 		fmt.Println("Client joined session", s.ID, "as LAPTOP")
-		if err := s.flushQueueLocked(connection, Laptop); err != nil {
-			fmt.Println("Failed to flush laptop queue:", err)
-		}
 		return true
 	}
 	if role == Phone {
@@ -66,9 +63,6 @@ func (s *Session) AddClient(connection net.Conn, role ClientRole) bool {
 		s.Phone = connection
 		s.phoneReaderStarted = false
 		fmt.Println("Client joined session", s.ID, "as PHONE")
-		if err := s.flushQueueLocked(connection, Phone); err != nil {
-			fmt.Println("Failed to flush phone queue:", err)
-		}
 		return true
 	}
 	return false
@@ -229,17 +223,26 @@ func (s *Session) flushQueueLocked(destination net.Conn, role ClientRole) error 
 			numberOfBytes, err := destination.Write(message)
 			message = message[numberOfBytes:]
 			(*queue)[0] = message
+
 			if len(message) == 0 {
 				*queue = (*queue)[1:]
 			}
+
 			if err != nil {
 				return err
 			}
+
 			if numberOfBytes == 0 {
 				return fmt.Errorf("connection wrote zero bytes")
 			}
 		}
-		*queue = (*queue)[1:]
 	}
 	return nil
+}
+
+// safely flushes pending data for a reconnecting client
+func (s *Session) FlushQueue(destination net.Conn, role ClientRole) error {
+    s.mu.Lock()
+    defer s.mu.Unlock()
+    return s.flushQueueLocked(destination, role)
 }
