@@ -71,7 +71,6 @@ func parseHandshake(message string) (command string, code string, role ClientRol
 }
 
 // handle connection handles one client connection
-
 func handleConnection(manager *SessionManager, connection net.Conn) {
 	reader := bufio.NewReader(connection)
 

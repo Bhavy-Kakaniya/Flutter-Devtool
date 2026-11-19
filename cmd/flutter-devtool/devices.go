@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-
 	"devtool/internal/adb"
+	"devtool/internal/hotspot"
 )
 
 // runDevices handles the "devices" CLI command.
@@ -35,7 +35,11 @@ func runDevices() {
 
 	// Handle the case where no devices are connected.
 	if len(devices) == 0 {
-		fmt.Println("No devices connected.")
+		fmt.Println("No devices connected via ADB.")
+		if info, err := hotspot.FindHotspot(); err == nil && info.GatewayIP != "" {
+			fmt.Printf("\nDetected active phone hotspot at %s (Laptop IP: %s).\n", info.GatewayIP, info.LaptopIP)
+			fmt.Println("Tip: Run 'flutter-devtool connect' to connect to your phone over the hotspot.")
+		}
 		return
 	}
 

@@ -59,9 +59,16 @@ func main() {
 
 	go func() {
 		for {
-			currentReader := manager.Reader()
+			currentReader, currentConnection := manager.Reader()
+			if currentReader == nil || currentConnection == nil {
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
 			message, err := currentReader.ReadString('\n')
 			if err != nil {
+				if !manager.IsCurrent(currentConnection) {
+					continue
+				}
 				fmt.Println("\nConnection lost. Attempting to reconnect...")
 				newConnection, newReader, reconnectErr := reconnectToRelay(sessionCode, role)
 				if reconnectErr != nil {
@@ -134,6 +141,8 @@ func connectToRelay(handshake string) (net.Conn, *bufio.Reader, string, error) {
 }
 
 func reconnectToRelay(sessionCode string, role string) (net.Conn, *bufio.Reader, error) {
+	retryDelay := 2 * time.Second
+	maxRetryDelay := 30 * time.Second
 	for {
 		handshake := "RECONNECT " + sessionCode + " " + role
 		connection, reader, _, err := connectToRelay(handshake)
@@ -142,7 +151,12 @@ func reconnectToRelay(sessionCode string, role string) (net.Conn, *bufio.Reader,
 			return connection, reader, nil
 		}
 		fmt.Println("Reconnect failed:", err)
-		time.Sleep(15 * time.Second)
+		time.Sleep(retryDelay)
+		retryDelay *= 2
+
+		if retryDelay > maxRetryDelay {
+			retryDelay = maxRetryDelay
+		}
 	}
 }
 
@@ -168,10 +182,16 @@ func (manager *connectionManager) Send(message string) error {
 	return err
 }
 
-func (manager *connectionManager) Reader() *bufio.Reader {
+func (manager *connectionManager) Reader() (*bufio.Reader, net.Conn) {
 	manager.mu.Lock()
 	defer manager.mu.Unlock()
-	return manager.reader
+	return manager.reader, manager.conn
+}
+
+func (manager *connectionManager) IsCurrent(connection net.Conn) bool {
+	manager.mu.Lock()
+	defer manager.mu.Unlock()
+	return manager.conn == connection
 }
 
 func (manager *connectionManager) Disconnect() {

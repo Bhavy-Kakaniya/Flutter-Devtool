@@ -11,15 +11,13 @@ import (
 // Client A = developer's laptop
 // Client B = Android device/agent
 // currently they are only 2 tcp clients
-
 type Session struct {
 	ID     int
 	Code   string
 	Laptop net.Conn
 	Phone  net.Conn
 	mu     sync.Mutex
-	// mu protects session from concurrent acess, multiple goroutines work with session at same time
-	// this prevents race condition
+	// mu protects session from concurrent acess, multiple goroutines work with session at same time this prevents race condition
 	removeCallback      func(int) // called when session is closed
 	started             bool
 	closed              bool
@@ -28,6 +26,8 @@ type Session struct {
 	phoneReaderStarted  bool
 	laptopMessageQueue  [][]byte
 	phoneMessageQueue   [][]byte
+	laptopGeneration uint64
+	phoneGeneration  uint64
 }
 
 type ClientRole string
@@ -52,6 +52,8 @@ func (s *Session) AddClient(connection net.Conn, role ClientRole) bool {
 			return false
 		}
 		s.Laptop = connection
+		s.generation++
+		s.laptopGeneration++
 		s.laptopReaderStarted = false
 		fmt.Println("Client joined session", s.ID, "as LAPTOP")
 		return true
@@ -61,6 +63,8 @@ func (s *Session) AddClient(connection net.Conn, role ClientRole) bool {
 			return false
 		}
 		s.Phone = connection
+		s.generation++
+		s.phoneGeneration++
 		s.phoneReaderStarted = false
 		fmt.Println("Client joined session", s.ID, "as PHONE")
 		return true
@@ -84,11 +88,11 @@ func (s *Session) StartRelay() {
 	phone := s.Phone
 	if !s.laptopReaderStarted {
 		s.laptopReaderStarted = true
-		go s.forward(laptop, Laptop)
+		go s.forward(laptop, Laptop, s.laptopGeneration)
 	}
 	if !s.phoneReaderStarted {
 		s.phoneReaderStarted = true
-		go s.forward(phone, Phone)
+		go s.forward(phone, Phone, s.phoneGeneration)
 	}
 	s.started = true
 	s.mu.Unlock()
@@ -112,27 +116,22 @@ func (s *Session) Close() {
 		s.Phone.Close()
 		s.Phone = nil
 	}
-
-	// save callback locally
-	// do this while holding lock so another goroutine cannot change callback while is is being used
 	removeCallback := s.removeCallback
-
 	s.mu.Unlock()
 	fmt.Println("Session", s.ID, "closed")
 
-	// notify SessionManager after releasing session lock
 	if removeCallback != nil {
 		removeCallback(s.ID)
 	}
 }
 
-func (s *Session) forward(source net.Conn, role ClientRole) {
+func (s *Session) forward(source net.Conn, role ClientRole, generation uint64) {
 	buffer := make([]byte, 4096)
 	for {
 		numberOfBytes, err := source.Read(buffer)
 		if err != nil {
 			fmt.Println("Read failed:", err)
-			s.RemoveClientByRole(source, role)
+			s.RemoveClientByRole(source, role, generation)
 			return
 		}
 		s.mu.Lock()
@@ -180,30 +179,41 @@ func (s *Session) RemoveClient(connection net.Conn, generation uint64) {
 
 	if s.Laptop == connection {
 		s.Laptop = nil
+		s.laptopReaderStarted = false
 		s.started = false
 		fmt.Println("Laptop disconnected from session", s.ID)
 	}
 
 	if s.Phone == connection {
 		s.Phone = nil
+		s.phoneReaderStarted = false
 		s.started = false
 		fmt.Println("Phone disconnected from session", s.ID)
 	}
 }
 
-func (s *Session) RemoveClientByRole(connection net.Conn, role ClientRole) {
+func (s *Session) RemoveClientByRole(connection net.Conn, role ClientRole, generation uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if role == Laptop && s.Laptop == connection {
+
+	if role == Laptop {
+		if s.Laptop != connection || s.laptopGeneration != generation {
+			return
+		}
 		s.Laptop = nil
 		s.laptopReaderStarted = false
 		s.started = false
 		fmt.Println("Laptop disconnected from session", s.ID)
 	}
-	if role == Phone && s.Phone == connection {
+
+	if role == Phone {
+		if s.Phone != connection || s.phoneGeneration != generation {
+			return
+		}
 		s.Phone = nil
 		s.phoneReaderStarted = false
 		s.started = false
+
 		fmt.Println("Phone disconnected from session", s.ID)
 	}
 }
@@ -242,7 +252,7 @@ func (s *Session) flushQueueLocked(destination net.Conn, role ClientRole) error 
 
 // safely flushes pending data for a reconnecting client
 func (s *Session) FlushQueue(destination net.Conn, role ClientRole) error {
-    s.mu.Lock()
-    defer s.mu.Unlock()
-    return s.flushQueueLocked(destination, role)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.flushQueueLocked(destination, role)
 }

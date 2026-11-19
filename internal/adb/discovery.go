@@ -1,11 +1,13 @@
 package adb
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 func adbPathFromSDK(sdkPath string) string {
@@ -17,7 +19,10 @@ func adbPathFromSDK(sdkPath string) string {
 }
 
 func findFlutterAndroidSDK() (string, error) {
-	command := exec.Command("flutter", "config", "--list")
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	command := exec.CommandContext(ctx, "flutter", "config", "--list")
 	output, err := command.Output()
 	if err != nil {
 		return "", err
@@ -56,19 +61,28 @@ func FindADB() (string, error) {
 		}
 	}
 
-	// 4. Ask Flutter for its configured Android SDK.
-	if sdkPath, err := findFlutterAndroidSDK(); err == nil {
+	// 4. Check common SDK installation locations on Windows drives.
+	for _, drive := range []string{"D:\\", "C:\\", "E:\\"} {
+		sdkPath := filepath.Join(drive, "Android", "Sdk")
 		if adbPath := adbPathFromSDK(sdkPath); adbPath != "" {
 			return adbPath, nil
 		}
 	}
 
-	// 5. Check the standard Windows Android SDK location.
+	// 5. Check the standard Windows Android SDK location in LocalAppData.
 	if localAppData := os.Getenv("LOCALAPPDATA"); localAppData != "" {
 		sdkPath := filepath.Join(localAppData, "Android", "Sdk")
 		if adbPath := adbPathFromSDK(sdkPath); adbPath != "" {
 			return adbPath, nil
 		}
 	}
+
+	// 6. Ask Flutter for its configured Android SDK.
+	if sdkPath, err := findFlutterAndroidSDK(); err == nil {
+		if adbPath := adbPathFromSDK(sdkPath); adbPath != "" {
+			return adbPath, nil
+		}
+	}
+
 	return "", fmt.Errorf("ADB executable not found")
 }
